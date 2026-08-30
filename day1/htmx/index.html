@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Day 1 HTMX Demo</title>
+    <script src="https://unpkg.com/htmx.org@2"></script>
+</head>
+<body>
+    <h1>HTMX Demo</h1>
+
+    <!-- B2: hx-get example -->
+    <!--
+        - hx-get="/time" will make an HTTP GET request to /time when the button is clicked.
+        - hx-target="#clock" tells HTMX where to put the response in the DOM.
+        - hx-swap="innerHTML" replaces the inner contents of the target element.
+    -->
+    <button hx-get="/time" hx-target="#clock" hx-swap="innerHTML">Get current time</button>
+    <div id="clock"><em>Time will appear here when you click the button</em></div>
+
+    <!-- B3: hx-post example -->
+    <!--
+        - hx-post="/echo" will POST form data to /echo without a full page reload.
+        - The input must have a name (msg) so the server can read it.
+        - hx-target="#echoResult" will place the server response into that element.
+    -->
+    <form hx-post="/echo" hx-target="#echoResult" hx-swap="innerHTML">
+        <input type="text" name="msg" placeholder="Type a message" />
+        <button type="submit">Send</button>
+    </form>
+    <div id="echoResult"><em>Echoed message will appear here</em></div>
+
+    <p>Server is ready.</p>
+</body>
+</html>

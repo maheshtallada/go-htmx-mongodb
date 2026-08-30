@@ -1,0 +1,33 @@
+C1:
+
+use day1
+
+db.engineers.insertMany([
+  { name: "Mahesh", role: "Senior Lead", years: 12, skills: ["Java", "Spring"] },
+  { name: "Asha", role: "SDE II", years: 5, skills: ["Go", "MongoDB"] },
+  { name: "Ravi", role: "SDE III", years: 8, skills: ["Go", "HTMX", "MongoDB"] }
+])
+
+db.engineers.countDocuments()  // expected: 3
+
+C2:
+1. All engineers with years >= 8 — return only name and years (hide _id).
+db.engineers.find({ years: { $gte: 8 } }, { name: 1, years: 1, _id: 0 })
+
+2. All engineers who know "Go".
+db.engineers.find({ skills: "Go" }, { name: 1, skills: 1, _id: 0 })
+
+3. Sort everyone by years descending.
+db.engineers.find({}, { name: 1, years: 1, _id: 0 }).sort({ years: -1 })
+
+
+C3:
+Q1: What BSON type is years? What about skills?
+Ans: years is a BSON Integer type, skills is a BSON Array type.
+Q2: What is _id and what type does MongoDB give it by default?
+Ans: _id is the primary key for each document in a MongoDB collection.
+    By default, MongoDB automatically generates a unique ObjectId for the
+    _id field if one is not provided when inserting a document, which is of type ObjectId (12-byte binary shown as a 24‑hex string).
+Q3: What is one difference between a document and a row, and a collection and a table?
+Ans: A document in MongoDB is similar to a row in a relational database, while a collection is similar to a table.
+    However, documents can have varying structures, whereas rows in a table typically have a fixed schema.
