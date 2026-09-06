@@ -26,10 +26,25 @@ from the start position).
 5. Append and growth
 - s = append(s, 4) // returns a new slice value (often same backing array or a new one if capacity exceeded)
 - append may allocate a new underlying array when capacity is insufficient.
+- This is the built-in function used when adding new engineers to the slice: engineers = append(engineers, newEngineer)
+- Important: append is not a method. It is a built-in function, so you call it as append(slice, value), not slice.append(value).
 
 6. Length and capacity
 - len(s) returns the number of elements
 - cap(s) returns the capacity (how many elements can be stored before reallocation)
+- Example: len(engineers) tells how many engineers are currently in the slice.
+
+7. Built-in slice helpers you will see often
+- append(slice, value): adds one or more values to the end of a slice
+- len(slice): returns the number of elements in the slice
+- cap(slice): returns the maximum number of elements the slice can hold before reallocation
+
+Examples:
+- engineers = append(engineers, Engineer{ID: 3, Name: "Nia", Role: "SDE I"})
+- count := len(engineers)
+- maxBeforeGrow := cap(engineers)
+
+These are not methods on slices. They are built-ins provided by Go itself.
 
 7. Indexing and slicing
 - Access: v := s[0]
@@ -165,3 +180,94 @@ This is the important point to remember:
 - `.Name` / `.Role` are fields of that one Engineer
 
 End of template notes.
+
+
+HTMX targeting and swapping: `hx-target`, `closest`, and `hx-swap`
+
+These are the key parts of the UI behavior in the Day 2 HTMX examples.
+
+1. `hx-target`
+- tells HTMX where to put the server response.
+- example: `hx-target="#list"`
+- meaning: after a request, replace or insert into the element whose id is `list`
+
+2. `closest`
+- `closest` is a CSS selector helper used with HTMX.
+- `hx-target="closest li"` means: find the nearest `<li>` ancestor of the clicked button.
+- this is useful when many rows exist and each button belongs to one row.
+
+Example from the delete button:
+```html
+<button type="button" hx-delete="/engineers/{{.ID}}" hx-target="closest li" hx-swap="outerHTML">
+  Delete
+</button>
+```
+
+This says: when the button is clicked,
+- send a DELETE request to the row's URL
+- find the nearest `<li>` around the button
+- replace that whole `<li>` with the server response
+
+3. `hx-swap` options and when to choose them
+
+- `innerHTML`
+  - replace only the inside of the target element
+  - use when the target element is a container and you want to update its contents
+  - example: `<div id="clock" hx-get="/time" hx-target="#clock" hx-swap="innerHTML">`
+
+- `outerHTML`
+  - replace the whole target element itself
+  - use when you want to remove a row or replace the whole element
+  - very common for delete behavior: `hx-target="closest li" hx-swap="outerHTML"`
+  - if the server returns an empty response, the target element disappears from the page
+
+- `beforeend`
+  - insert new content at the end of the target element
+  - use when appending a new list item to an existing `<ul>` or `<ol>`
+  - example: `hx-target="#list" hx-swap="beforeend"`
+
+- `afterend`
+  - insert new content immediately after the target element
+
+- `beforeend` vs `innerHTML`
+  - `beforeend` adds content without replacing the existing items
+  - `innerHTML` replaces all existing contents inside the target
+
+4. Example choices
+
+A. Add new row to a list
+```html
+<form hx-post="/engineers" hx-target="#list" hx-swap="beforeend">
+  <input name="name" />
+  <input name="role" />
+  <button type="submit">Add</button>
+</form>
+```
+Use this when you want to keep existing items and append one more item.
+
+B. Replace a single value area
+```html
+<button hx-get="/time" hx-target="#clock" hx-swap="innerHTML">Get time</button>
+```
+Use this when the target is a single area and you want to replace its contents.
+
+C. Remove a row from a table/list
+```html
+<button hx-delete="/engineers/2" hx-target="closest li" hx-swap="outerHTML">Delete</button>
+```
+Use this when you want to remove an exact row tied to a clicked button.
+
+D. Replace the whole tag itself
+```html
+<div id="status" hx-get="/status" hx-target="#status" hx-swap="outerHTML"></div>
+```
+Use this when the server returns a replacement for the full element.
+
+5. The mental rule
+- `hx-target` = where to send the result
+- `closest` = pick the nearest relevant element (like the current row)
+- `hx-swap` = how to place the response inside that target
+
+This is why the delete row example works: it finds the row and removes exactly that row, not the whole list.
+
+End of HTMX swap notes.
