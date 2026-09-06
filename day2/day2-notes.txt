@@ -101,63 +101,67 @@ update `day2/go` tests and `day2/htmx/server.go` to import and use it. Reply yes
 If you'd rather keep duplicates, tell me and I'll only update docs.
 
 
-TEMPLATES: how `{{range .}}` renders the Go slice into HTML
+TEMPLATES: what is the value passed to `{{range .}}`?
 
-- Server-side execution:
-  - Go templates are evaluated on the server when you call tmpl.ExecuteTemplate(w, "page", data).
-  - The template engine walks the template AST and produces a single output string (HTML) that is sent to the browser.
-  - That means `{{range .}}` runs completely before the browser sees the page — it's not a client-side loop.
+The actual value is the Go variable `engineers`:
 
-- `{{range .}}` is like a for-loop over the current pipeline value:
-  - If you pass a slice (e.g., `engineers`) as the root data, `{{range .}}` iterates over each element in the slice.
-  - Inside the range, the dot (`.`) is the current element. So `{{.Name}}` accesses the Name field of that element.
+```go
+var engineers = []Engineer{
+    {1, "Mahesh", "Senior Lead"},
+    {2, "Asha", "SDE II"},
+}
+```
 
-- Basic example from the server template:
-  ```gotemplate
-  <ul id="list">
-  {{range .}}
-    <li id="eng-{{.ID}}">{{.Name}} - {{.Role}}</li>
-  {{end}}
-  </ul>
-  ```
-  This produces one `<li>` per element in the slice.
+This is a slice of `Engineer` values.
 
-- Getting the index and value:
-  - You can capture index and value with `range` variables:
-    ```gotemplate
-    {{range $i, $e := .}}
-      <li>{{$i}}: {{$e.Name}} - {{$e.Role}}</li>
-    {{end}}
-    ```
-  - `$i` is the zero-based index, `$e` is the current element.
+Then the server does this:
 
-- When the slice is empty or nil:
-  - `{{range .}}...{{end}}` renders nothing (no iterations). No error.
-  - You can provide an `else` block to render a placeholder when empty:
-    ```gotemplate
-    {{range .}}
-      ... list items ...
-    {{else}}
-      <li>No engineers yet</li>
-    {{end}}
-    ```
+```go
+tmpl.ExecuteTemplate(w, "page", engineers)
+```
 
-- Dot (.) scoping rules:
-  - The dot changes inside actions. At the top level, dot is the data you pass to ExecuteTemplate.
-  - Inside `range`, dot becomes the current item unless you explicitly bind it to a variable (e.g., `{{range $i, $e := .}}`).
-  - Use explicit variables if you need both the parent dot and the current item.
+Meaning: pass the whole slice as the template data.
 
-- Is it a "for loop in HTML"?
-  - Sort of: it's a template directive that produces repeated HTML elements on the server. It is not HTML syntax — it's part of Go's template language that generates HTML text.
-  - The browser only sees the final HTML result, not the template instructions.
+Inside the template:
 
-- Security and escaping:
-  - Go templates escape values automatically when rendering into HTML contexts, but if you build fragments manually be careful. Prefer template fields and html/template's behavior for safety.
+```gotemplate
+{{range .}}
+  <li id="eng-{{.ID}}">
+    {{.Name}} - {{.Role}}
+  </li>
+{{end}}
+```
 
-- Practical checklist when using `range` to render slices:
-  - Ensure you pass the correct data to ExecuteTemplate (slice or struct containing the slice).
-  - Use `{{else}}` to handle empty lists gracefully.
-  - Use `$`-prefixed variables to capture index/value if needed.
-  - Remember template execution happens server-side; client receives final HTML only.
+This is the flow:
+
+- `.` at the top level is the whole slice (`engineers`)
+- `{{range .}}` says: iterate over each element of that slice
+- each iteration gives one item
+- that item is a single `Engineer` struct
+- inside the loop, the dot (`.`) is now that one `Engineer`
+- so `.ID`, `.Name`, `.Role` mean: read the ID, Name, Role fields from this single Engineer
+
+Example:
+
+- first iteration: current item = `{1, "Mahesh", "Senior Lead"}`
+  - `.ID` => 1
+  - `.Name` => "Mahesh"
+  - `.Role` => "Senior Lead"
+
+- second iteration: current item = `{2, "Asha", "SDE II"}`
+  - `.ID` => 2
+  - `.Name` => "Asha"
+  - `.Role` => "SDE II"
+
+So the item is not the `h1` heading and not a separate "Engineers" object.
+`h1` is just plain static HTML. The loop is only iterating the slice.
+
+It is effectively a template loop, not an HTML loop. It's Go template syntax that generates repeated HTML for each item in the slice.
+
+This is the important point to remember:
+
+- outer data passed to template = slice of Engineer
+- inside `range` = one Engineer at a time
+- `.Name` / `.Role` are fields of that one Engineer
 
 End of template notes.
