@@ -76,14 +76,26 @@ bool - false
 
 
 A3:
+
+
 Q1 Ans: Go uses capitalized function names to indicate that they are exported and can be accessed from other packages. This is a convention in Go to differentiate between public and private functions. Functions that start with a lowercase letter are unexported and can only be accessed within the same package.
+
+
 Q2 Ans: (How are Go's multiple return values different from Java?) : In Go, functions can return multiple values simultaneously, which is a unique feature compared to Java. This allows for more flexible and expressive code, especially when dealing with operations that naturally produce multiple related results.
+
+
 Q3 (What does t.Fatalf do vs t.Error?): In Go's testing framework, `t.Fatalf` is used to log an error message and immediately stop the execution of the test, marking it as failed. On the other hand, `t.Error` logs an error message but allows the test to continue running, which can be useful for reporting multiple errors in a single test case.
 
 B3:
+
+
 Q1 (What is the default value of hx-swap if you don't set it?): 
 Ans: The default value of `hx-swap` is "innerHTML". If you don't set it, the content of the target element will be replaced with the response from the server, effectively updating the inner HTML of that element.
+
+
 Q2 (What's the difference between innerHTML and outerHTML swaps?): 
 Ans: The difference between `innerHTML` and `outerHTML` swaps is that `innerHTML` replaces the content inside the target element, while `outerHTML` replaces the entire target element itself, including its opening and closing tags. Using `innerHTML` allows you to update just the content, whereas `outerHTML` allows you to replace the whole element with new content.
+
+
 Q3" (Why does HTMX return HTML fragments instead of JSON here?):
 Ans: HTMX returns HTML fragments instead of JSON in this context because it is designed to work with server-rendered HTML. By returning HTML fragments, HTMX can directly update parts of the web page without requiring additional client-side rendering logic. This approach simplifies the development process and allows for a more seamless integration of server-side rendering with client-side interactivity, enabling developers to create dynamic web applications with less complexity and overhead compared to using JSON and client-side rendering frameworks.
