@@ -1,0 +1,84 @@
+﻿A1 — Micro-questions (assignment-specific answers)
+
+1. Why does Go return errors instead of throwing exceptions?
+
+Go treats errors as values so handling is explicit and local. Returning errors makes control flow obvious: callers receive the error value and decide how to respond. This avoids hidden control flow from exceptions and helps with clear resource cleanup (no automatic stack unwinding). The language and idioms encourage immediate, simple error checks, which reduces surprising runtime failures.
+
+2. What is a sentinel error?
+
+A sentinel error is a predefined package-level error value (for example, `ErrInsufficientFunds`) used to indicate a specific, well-known failure condition. It’s created with `errors.New(...)` and returned directly from functions for callers to detect.
+
+- Callers should check it using `errors.Is(err, ErrInsufficientFunds)`, which still works if the sentinel is wrapped with `%w` to add context.
+- Sentinels are good for simple, common errors. For richer error data, define a custom error type and use `errors.As` to extract fields.
+
+Notes on wrapping and context:
+
+- Returning the sentinel directly:
+    return 0, ErrInsufficientFunds
+
+- Wrapping with context (keeps sentinel discoverable):
+    return 0, fmt.Errorf("pay %s: %w", item, ErrInsufficientFunds)
+
+Both patterns are valid; prefer wrapping when you want extra context while keeping the sentinel detectable via `errors.Is`.
+
+---
+
+What is `w` for?
+
+- `w` is the conventional name for the first parameter of HTTP handler functions: `func(w http.ResponseWriter, r *http.Request)`.
+- Its type, `http.ResponseWriter`, is an interface used to build the HTTP response: set headers, status codes, and write the response body.
+
+Common uses:
+
+    w.Header().Set("Content-Type", "text/html")
+    w.WriteHeader(http.StatusOK) // must be called before writing body to set status code
+    fmt.Fprintln(w, "Hello, world") // writes body to client
+
+Notes:
+- Do not store `w` for use outside the request handler; it is only valid for the lifetime of the request.
+- The name `w` is just a convention (short for "writer"); any valid identifier may be used.
+- `fmt.Fprintln(w, "text")` writes to the HTTP response body. It does not automatically print to the terminal. If you want output in the terminal too, do a separate `fmt.Println("text")`.
+
+What does %w mean in fmt.Errorf?
+
+- %w is the formatting verb used by fmt.Errorf to wrap an existing error value into a new error that carries additional context while preserving the original error as the cause.
+- The wrapped error can be inspected with errors.Unwrap and identified with errors.Is or extracted with errors.As.
+
+Example:
+    return 0, fmt.Errorf("pay %s: %w", item, ErrInsufficientFunds)
+
+This produces an error whose Error() string is, e.g., "pay coffee: insufficient funds" while errors.Is(err, ErrInsufficientFunds) returns true.
+
+Notes:
+- Use %v or %s to include the error text without wrapping; %w keeps the error chain for unwrapping.
+- Only wrap actual error values with %w (not strings).
+- The purpose of wrapping is to preserve the original sentinel or underlying error while adding context. For example, `fmt.Errorf("pay %s: %w", item, ErrInsufficientFunds)` keeps the sentinel detectable with `errors.Is`, but still gives the user a more specific message.
+
+A3 — Micro-questions (error matching and wrapping)
+
+1. What is the difference between `errors.Is` and `errors.As`?
+
+`errors.Is` checks whether an error matches a target value or sentinel, often using the same sentinel error across wrapped errors. It is best for comparing against `ErrInsufficientFunds` or another known error value. `errors.As` checks whether the error chain contains a specific concrete error type, such as `*ValidationError`, and then lets you access the fields of that concrete error.
+
+Example:
+    if errors.Is(err, ErrInsufficientFunds) {
+        // same sentinel, even if wrapped
+    }
+
+    var ve *ValidationError
+    if errors.As(err, &ve) {
+        fmt.Println(ve.Field)
+    }
+
+2. What is the difference between `%w`, `%v`, and `%s` in `fmt.Errorf`?
+
+`%w` wraps the original error so the error chain is preserved and can be checked later with `errors.Is` or `errors.As`. `%v` and `%s` only format the error text; they do not preserve the underlying error chain.
+
+Example:
+    return 0, fmt.Errorf("pay %s: %w", item, err)
+
+This keeps the original error available for inspection, while the message remains readable for humans.
+
+3. Why do we wrap errors instead of just printing them?
+
+Because wrapping keeps structured error information intact. Callers can still detect the real cause and respond appropriately, while the message adds helpful context such as the failed operation or field name.
