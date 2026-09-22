@@ -56,29 +56,42 @@ Notes:
 
 A3 — Micro-questions (error matching and wrapping)
 
-1. What is the difference between `errors.Is` and `errors.As`?
+1. Difference between `errors.Is` and `errors.As`?
 
-`errors.Is` checks whether an error matches a target value or sentinel, often using the same sentinel error across wrapped errors. It is best for comparing against `ErrInsufficientFunds` or another known error value. `errors.As` checks whether the error chain contains a specific concrete error type, such as `*ValidationError`, and then lets you access the fields of that concrete error.
+`errors.Is` checks whether an error in the chain equals a target value (a sentinel). Use it to detect known sentinel errors like `ErrInsufficientFunds` even if they are wrapped. `errors.As` looks for a concrete error type in the chain (e.g. `*ValidationError`) and, if found, assigns it so you can read its fields.
 
 Example:
-    if errors.Is(err, ErrInsufficientFunds) {
-        // same sentinel, even if wrapped
-    }
+    if errors.Is(err, ErrInsufficientFunds) { /* handle sentinel */ }
 
     var ve *ValidationError
-    if errors.As(err, &ve) {
-        fmt.Println(ve.Field)
-    }
+    if errors.As(err, &ve) { fmt.Println(ve.Field) }
 
-2. What is the difference between `%w`, `%v`, and `%s` in `fmt.Errorf`?
+2. What does `%w` do that `%v` does not?
 
-`%w` wraps the original error so the error chain is preserved and can be checked later with `errors.Is` or `errors.As`. `%v` and `%s` only format the error text; they do not preserve the underlying error chain.
+`%w` wraps the original error into the new error value, preserving the error chain so `errors.Unwrap`, `errors.Is`, and `errors.As` work. `%v` (or `%s`) only formats the error text into the new message and discards the original error's identity/type.
 
 Example:
-    return 0, fmt.Errorf("pay %s: %w", item, err)
+    // preserves chain
+    return fmt.Errorf("pay %s: %w", item, err)
+    // loses chain (only message kept)
+    return fmt.Errorf("pay %s: %v", item, err)
 
-This keeps the original error available for inspection, while the message remains readable for humans.
+3. When should you wrap vs. return the error unchanged?
 
-3. Why do we wrap errors instead of just printing them?
+- Wrap when adding useful context (operation, resource, field) that helps debugging or user messages, but you still want callers to detect the original cause. Example: wrapping a DB error with the failing query.
+- Return the error unchanged (or return a sentinel directly) when you are the originator of a well-known error and want callers to match it exactly without extra context, or when no extra context is meaningful.
+- Prefer wrapping the actual `err` returned by lower-level calls (not re-wrapping a different sentinel) so callers can still use `errors.Is`/`errors.As` reliably.
 
-Because wrapping keeps structured error information intact. Callers can still detect the real cause and respond appropriately, while the message adds helpful context such as the failed operation or field name.
+B2 — HTMX micro-questions
+
+1. Why return `422` instead of `200` for a validation error?
+
+A validation error is not a successful request; the request was accepted by the server, but the submitted data failed business rules. `422 Unprocessable Entity` is the conventional HTTP status for that case. It tells the client the input needs correction, while still letting HTMX process the returned HTML fragment.
+
+2. Difference between `HX-Redirect` and `HX-Location`?
+
+`HX-Redirect` tells HTMX to navigate the browser to a new URL as a full page load. `HX-Location` is used for client-side navigation updates where HTMX handles location changes without a simple full page replacement, typically for more controlled client-side transitions.
+
+3. Why do server-side validation even if you also validate in the browser?
+
+Browser validation is only UX and can be bypassed. Server-side validation is the real security and correctness boundary. It ensures the backend enforces rules even if a client is malicious, outdated, or manually edited.
