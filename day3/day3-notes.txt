@@ -95,3 +95,17 @@ A validation error is not a successful request; the request was accepted by the 
 3. Why do server-side validation even if you also validate in the browser?
 
 Browser validation is only UX and can be bypassed. Server-side validation is the real security and correctness boundary. It ensures the backend enforces rules even if a client is malicious, outdated, or manually edited.
+
+C4 — MongoDB understanding
+
+1. What does `1` vs `0` mean in a projection? Can you mix them?
+
+In MongoDB projection, `1` means include the field and `0` means exclude it. For example, `{ customer: 1, total: 1 }` includes only those fields. The same projection cannot mix `1` and `0` for the same document unless you are excluding `_id` with `0` while including other fields. In practice, you usually either include fields with `1` or exclude fields with `0`.
+
+2. What does `.sort({ total: -1 })` mean? What is `1`?
+
+`sort({ total: -1 })` sorts by the `total` field in descending order (`-1` means descending, `1` means ascending). So a larger total appears first.
+
+3. Why use `.limit()` for pagination performance?
+
+`.limit()` restricts how many documents the server returns, reducing network load and memory usage. It helps pagination by fetching only a small page at a time instead of the whole collection, improving performance and responsiveness.
