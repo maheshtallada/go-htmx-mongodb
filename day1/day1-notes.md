@@ -1,9 +1,12 @@
 cmd: go version
+
 res: go version go1.27.0 windows/amd64
 
 cmd: mongod --version
+
 res: mongod : The term 'mongod' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a
 path was included, verify that the path is correct and try again.
+
 At line:1 char:1
 + mongod --version
 + ~~~~~~
@@ -14,7 +17,9 @@ This is expected as we are not running the MongoDB Server (Daemon) installed loc
 
 
 cmd: mongosh --version
+
 res: 2.10.0
+
 
 We're connected to MongoDB Atlas using the MongoDB Shell (mongosh) version 2.10.0. 
 This indicates that we can interact with our MongoDB Atlas cluster through the shell, 
@@ -52,10 +57,13 @@ TMG1964mahesh
 
 
 cmd: mkdir -p day1/go
+
 -p is used to create parent directories as needed. In this case, it will create the directory structure "day1/go" if it does not already exist.
 
 cmd: go mod init day1
+
 res: go: creating new go.mod: module day1
+
 explanation: The command `go mod init day1` initializes a new Go module in the current directory. It creates a `go.mod` file that defines the module's path as "day1". This file is used to manage dependencies and versions for the Go project.
 
 A1:
