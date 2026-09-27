@@ -25,7 +25,7 @@ Aim for green checkmarks, not perfection.
 
 ### Checkpoint 0.1 — Reuse yesterday's project or make a fresh one
 
-Paste outputs into `answers/day2-notes.md`.
+Paste outputs into `../day2/day2-notes.md`.
 
 ```bash
 go version          # still there
@@ -444,7 +444,7 @@ Speak 90–120 seconds answering **"Walk me through a project you led."** Cover:
 - [ ] HTMX: list renders (B1), add appends a row (B2), delete removes a row (B3)
 - [ ] MongoDB: CRUD all four work (C1–C4)
 - [ ] English: vocab + grammar attempt + recorded project walkthrough
-- [ ] `answers/day2-notes.md` has all micro-question answers
+- [ ] `../day2/day2-notes.md` has all micro-question answers
 
 **Score yourself:** _/5 sections green. Anything red = tomorrow's warm-up.
 

@@ -23,7 +23,7 @@ Don't aim for perfect — aim for **green checkmarks**.
 
 ### Checkpoint 0.1 — Install and verify versions
 
-Paste outputs into `answers/day1-notes.md`.
+Paste outputs into `../day1/day1-notes.md`.
 
 ```bash
 go version          # expect go1.2x.x
@@ -376,7 +376,7 @@ Speak 60-90 seconds answering **"Tell me about yourself."** Cover:
 - [ ] HTMX: button swaps time (B2) and form echoes message (B3)
 - [ ] MongoDB: 3 queries return correct results (C2)
 - [ ] English: vocab sentences + grammar attempt + recorded intro
-- [ ] `answers/day1-notes.md` has all micro-question answers
+- [ ] `../day1/day1-notes.md` has all micro-question answers
 
 **Score yourself:** _/5 sections green. **Anything red = tomorrow's warm-up.**
 
