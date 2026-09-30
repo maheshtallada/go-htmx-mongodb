@@ -1,0 +1,42 @@
+## Part A — What the assignment asks you to do
+
+Part A is a Go practice section with three required tasks and one optional stretch task:
+
+1. **A1 — Slices and `range`:** Implement `Filter` to return the even numbers and `SumRange` to add all numbers. Use `range` in both and run their tests.
+2. **A2 — Maps:** Implement `WordCount` to return a map containing each word and its count. Run the test, including its check that a missing key is absent.
+3. **A3 — Generics:** Implement `MapSlice` so a function transforms each input value into an output value, even when the input and output types differ. Run its test.
+4. **A4 — Optional stretch:** Implement generic `Keys` to return all keys from a map. It uses `K comparable` because Go map keys must be comparable, while `V any` allows any value type. The returned key order is unspecified.
+
+The required checkpoint is to make the A1–A3 tests pass with `go test ./...`. A4 is optional, but its implementation and test are included in this project.
+
+## A1. Slices & `range` — Micro-questions
+
+1. **Length vs. capacity:** Length is the number of elements currently in a slice; capacity is how many elements it can hold in its underlying array before needing a larger one. Use `len()` and `cap()` to check them:
+
+   ```go
+   nums := make([]int, 2, 5)
+   fmt.Println(len(nums)) // 2 — current number of elements
+   fmt.Println(cap(nums)) // 5 — available capacity
+   ```
+2. **Appending beyond capacity:** Go allocates a larger underlying array and copies the slice's elements into it. The slice returned by `append` refers to this new array; other slices sharing the old array are unaffected.
+
+## A2. Maps — Comma-ok Idiom and Iteration Order
+
+An **idiom** is a common, conventional way of expressing a pattern in a language. In a map lookup, `value, ok := m[key]` is Go's **comma-ok idiom**: `value` gets the stored value (or its zero value if absent), and `ok` is `true` only when the key exists. This distinguishes a missing key from a key stored with its zero value:
+
+```go
+count, ok := counts["go"] // The first "ok" declares a bool holding whether the key exists.
+if ok {                   // This "ok" uses that bool as the if condition.
+    fmt.Println("present with count", count)
+}
+```
+
+The test `if _, ok := got["missing"]; ok` uses the same pattern in an `if` initializer. `_` discards the map value because the test only needs to know whether the key exists. The `ok` after the semicolon is the condition.
+
+**Trap check — map iteration order:** No. Go does not guarantee map iteration order, and it may vary between iterations. Do not rely on it; sort the keys if you need a consistent order.
+
+## A3. Generics — Micro-questions
+
+1. **What is a type constraint?** A constraint states which types a generic type parameter can use and what operations are allowed. `any` permits any type; `comparable` permits types that can be compared with `==` and `!=` (and used as map keys).
+2. **When are generics preferable to `any` and type assertions?** Use generics when the same code should work with multiple types while keeping compile-time type safety, such as transforming `[]string` into `[]int`. Use `any` when values genuinely may be unrelated types and you need to handle them dynamically; assertions then require checking or converting their types at runtime.
+3. **What are the zero values of maps and slices, and which can be read?** Both have a `nil` zero value. A nil map can be looked up safely (a missing key gives the value type's zero value), but assigning to it panics. A nil slice has length zero and can be ranged over or appended to, but it has no valid index to read.

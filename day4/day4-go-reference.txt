@@ -1,0 +1,77 @@
+## Go `make` and Creating Values
+
+`make` is a Go built-in function, not a method. It initializes slices, maps, and channels so they are ready to use. It does not create arrays, structs, or ordinary scalar values. The arguments depend on the type being made.
+
+```go
+// 1. Slice with length 3; its elements start at their zero values.
+numbers := make([]int, 3)
+
+// 2. Slice with length 2 and capacity 5; append can use the extra capacity.
+buffer := make([]string, 2, 5)
+
+// 3. Empty slice literal; append can grow it.
+names := []string{}
+
+// 4. Array literal; arrays have a fixed length.
+scores := [3]int{90, 85, 100}
+
+// 5. Empty map; ready to store key-value pairs.
+counts := make(map[string]int)
+
+// 6. Map with an initial capacity hint; it can still grow as needed.
+users := make(map[int]string, 10)
+
+// 7. Map literal; creates and initializes entries in one expression.
+settings := map[string]bool{"debug": true, "cache": false}
+```
+
+## Channels
+
+Channels let goroutines communicate by sending and receiving values. They are commonly used to pass work or results between concurrent tasks.
+
+```go
+messages := make(chan string)
+go func() {
+    messages <- "task complete" // Send; waits until a receiver is ready.
+}()
+message := <-messages // Receive; waits until a value is available.
+fmt.Println(message)
+```
+
+An unbuffered channel requires a sender and receiver to meet before either proceeds. A buffered channel can hold a limited number of values without an immediate receiver:
+
+```go
+// Unbuffered: the send waits until a receiver is ready.
+events := make(chan string)
+
+// Buffered: these two sends fit in the channel before any receive.
+jobs := make(chan int, 2)
+jobs <- 101
+jobs <- 102
+firstJob := <-jobs // Receives 101; the remaining value is 102.
+```
+
+## `new` and Pointers
+
+`make` initializes only slices, maps, and channels. `new(int)` is different: it allocates a zero-initialized `int` and returns a pointer to it (`*int`).
+
+```go
+value := new(int) // value points to an int whose initial value is 0.
+*value = 7        // Dereference the pointer to store 7 in that int.
+```
+
+## Common Go Idioms
+
+An **idiom** is a common, conventional way to express a pattern in a language. Examples of Go idioms include:
+
+```go
+name := "Go" // Short declaration: declare and initialize a local variable.
+
+for _, word := range words { // Range over slice values; _ ignores the index.
+    fmt.Println(word)
+}
+
+if err := doWork(); err != nil { // Check an error immediately after the operation.
+    return err
+}
+```
