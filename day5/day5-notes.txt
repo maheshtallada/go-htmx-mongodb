@@ -1,0 +1,22 @@
+## Part A — Go Concurrency Answers
+
+### A1. Goroutines and `WaitGroup`
+
+1. **What does `sync.WaitGroup` do?** It lets one goroutine wait until a group of other goroutines finishes. Call `Add(n)` before starting `n` workers to increase its counter, call `Done()` once when each worker finishes (often with `defer`), and call `Wait()` in the coordinating goroutine to block until the counter reaches zero. Registering workers before launching them prevents `Wait` from returning before they are counted.
+2. **Why are writes to distinct slice indices race-free, but concurrent `append` is not?** Each worker can write to a separate, preallocated element such as `out[i]`; those workers do not modify the same memory location. This is safe only when every worker owns a distinct index and nobody reads the results until all workers finish. Concurrent `append` to a shared slice is unsafe because append updates the shared slice header (length and possibly backing-array pointer) and may write into shared backing-array storage. Protect shared appends with synchronization or send results through a channel.
+
+### A2. Channels
+
+**Trap check — reading from a channel that is never closed:** If no value is available, the receive blocks. If no other goroutine can ever send a value, the program may deadlock. A `for value := range ch` loop also waits for more values until the channel is closed.
+
+**Trap check — sending on a closed channel:** A send to a closed channel panics. The sender/producer should own closing the channel, and it should close it only after all sends are complete. Receiving from a closed channel is safe: buffered values are received first, then further receives return the element type's zero value immediately.
+
+### A3. Context, cancellation, and synchronization
+
+1. **What is a deadlock, and how does Go detect some deadlocks?** A deadlock is when goroutines are blocked waiting for work or events that can never happen, so the program cannot make progress. The Go runtime detects some total deadlocks—for example, when every goroutine is blocked and no timer or external event can unblock them—and reports `fatal error: all goroutines are asleep - deadlock!`. It cannot identify every logical deadlock, especially when some goroutine remains runnable or waits on external activity.
+2. **When should you use a `Mutex` versus a channel?** Use a `sync.Mutex` to protect shared state that multiple goroutines need to access or update, such as the `Counter` in `concurrent.go`. Use a channel to communicate values, send work/results, or coordinate events between goroutines. Choose the clearest tool for the ownership and synchronization needed; they are not interchangeable in every design.
+3. **Why is `context.Context` conventionally the first parameter?** It makes cancellation, deadlines, and request-scoped values visible at the call site, and lets a function pass that context down to the work it starts. Go conventions place it first so APIs are consistent and cancellation is easy to propagate. Contexts are passed explicitly rather than stored in a struct or used as an optional parameter.
+
+### A4. Mutex-protected counter (stretch)
+
+A4 asks for a counter shared by 100 goroutines, with the final total equal to 100 and no data race. `Counter.Increment` locks before changing the shared integer and unlocks afterward. `Counter.Value` takes the same lock while reading it. The test waits for all 100 goroutines with a `WaitGroup` before checking the result, so it verifies both synchronization and the expected total.
