@@ -37,7 +37,7 @@ func Produce(n int) <-chan int {
 	return ch // Expose receive-only access so callers can read but cannot send or close it.
 }
 
-// SumChan reads values until ch is closed and returns their total.
+// SumChan reads all values from ch until closed and returns the sum.
 func SumChan(ch <-chan int) int {
 	sum := 0                // Start at zero, the additive identity for integer addition.
 	for value := range ch { // Receive each value and stop automatically when ch is closed.

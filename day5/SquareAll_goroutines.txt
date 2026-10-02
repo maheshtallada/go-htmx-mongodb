@@ -1,0 +1,331 @@
+GO ROUTINES
+
+SquareAll: a beginner-friendly walkthrough
+==========================================
+
+The function we are explaining:
+
+    func SquareAll(nums []int) []int {
+        out := make([]int, len(nums))
+        var wg sync.WaitGroup
+
+        for i, n := range nums {
+            wg.Add(1)
+            go func(index, number int) {
+                defer wg.Done()
+                out[index] = number * number
+            }(i, n)
+        }
+
+        wg.Wait()
+        return out
+    }
+
+What the function does
+----------------------
+
+SquareAll receives a slice of integers, calculates the square of every number
+at the same time using goroutines, and returns a new slice of results in the
+same order as the input.
+
+For example:
+
+    input:  [1, 2, 3, 4]
+    output: [1, 4, 9, 16]
+
+The calculations might finish in a different order, but each result is written
+to the output position corresponding to its original input position. That is
+how the function preserves order.
+
+Line-by-line explanation
+------------------------
+
+    func SquareAll(nums []int) []int {
+
+- `func` starts a function declaration.
+- `SquareAll` is the function's name.
+- `nums []int` means the function receives a slice of integers named `nums`.
+- The final `[]int` means the function returns a slice of integers.
+- The opening `{` begins the function body.
+
+    out := make([]int, len(nums))
+
+- `out` is a new slice where the function will store the answers.
+- `make([]int, len(nums))` creates a slice of integers with exactly as many
+  positions as there are input numbers.
+- `len(nums)` gets the number of elements in the input slice.
+- The slice positions are numbered from `0` through `len(nums)-1`.
+- Each position initially contains the zero value for `int`, which is `0`.
+- We create the full output slice before starting goroutines, so every
+  goroutine can write to its own already-existing position.
+
+    var wg sync.WaitGroup
+
+- `var` declares a variable.
+- `wg` is the variable's name.
+- `sync.WaitGroup` is a synchronization type from Go's standard `sync` package.
+- It lets this function wait until a group of goroutines has finished.
+- A new `WaitGroup` starts with a counter of zero.
+
+    for i, n := range nums {
+
+- `for` starts a loop.
+- `range nums` visits each element in the slice.
+- `i` is the index (position) of the current element.
+- `n` is the value at that position.
+- `range` declares and assigns `i` and `n` on each loop iteration; they do not
+  need to be initialized earlier.
+- For `nums := []int{1, 2, 3, 4}`, the loop values are:
+
+      first iteration:  i = 0, n = 1
+      second iteration: i = 1, n = 2
+      third iteration:  i = 2, n = 3
+      fourth iteration: i = 3, n = 4
+
+    wg.Add(1)
+
+- `Add(1)` increases the WaitGroup counter by one.
+- This is done once for every worker goroutine that is about to start.
+- It must happen before starting that goroutine, so the counter is registered
+  before `Wait` can check whether all workers have finished.
+
+        go func(index, number int) {
+
+- `go` tells Go to run the following function in a new goroutine.
+- A goroutine is a lightweight unit of work managed by the Go runtime. It can
+  run concurrently with the function that started it and with other goroutines.
+- `func(index, number int) { ... }` is an anonymous function: a function with
+  no declared name.
+- The anonymous function is written inside `SquareAll`, but it runs
+  independently after the `go` keyword starts it.
+- `index` and `number` are parameters of this anonymous function. Both have
+  type `int`.
+- They receive the current loop's `i` and `n`, respectively, when the function
+  is called at the end of the statement.
+
+        defer wg.Done()
+
+- `defer` schedules a function call to run when the surrounding function
+  returns.
+- Here, `wg.Done()` subtracts one from the WaitGroup counter.
+- Since it is deferred, it will run when this worker has finished its
+  calculation, including if the function later gains more early returns.
+- Every successful `wg.Add(1)` must be balanced by one `Done()` call.
+- `Done()` is equivalent to `Add(-1)`.
+
+        out[index] = number * number
+
+- `number * number` multiplies the input number by itself.
+- `out[index]` means the output slice position identified by `index`.
+- The result is written into the same position that the input came from.
+- For example, the worker given `index = 2` and `number = 3` writes `9` to
+  `out[2]`.
+- Each worker is given a distinct index, so workers do not write to the same
+  slice element. The WaitGroup makes the main function wait before it returns
+  or reads the completed results.
+
+        }(i, n)
+
+- The `}` ends the anonymous function body.
+- The `(i, n)` immediately after it calls that anonymous function.
+- It passes the current loop's `i` as the `index` parameter and `n` as the
+  `number` parameter.
+- This is not a second loop or a special goroutine syntax; it is an ordinary
+  function call that is started with `go`.
+- Passing these values as arguments gives this worker its own copies of the
+  index and number for that call.
+
+    }
+
+- This closes the `for` loop. The loop has now started one worker per input
+  element; the workers may still be running.
+
+    wg.Wait()
+
+- `Wait()` blocks the current goroutine (the one running `SquareAll`) until
+  the WaitGroup counter reaches zero.
+- Each worker calls `Done()` when it finishes, reducing the counter.
+- When every worker has called `Done()`, `Wait()` returns.
+- Therefore, `out` is fully populated before the function returns it.
+
+    return out
+
+- `return` sends the completed output slice back to the caller.
+- Because workers write by original index, the result order matches the input
+  order even if the workers finish in a different order.
+
+    }
+
+- This closes the `SquareAll` function.
+
+What is a WaitGroup, and why use it here?
+----------------------------------------
+
+A `sync.WaitGroup` is a counter used to wait for multiple goroutines to finish.
+It does not start goroutines and does not collect their results. The `go`
+keyword starts each worker; the output slice holds the results; the WaitGroup
+only coordinates when it is safe for SquareAll to return.
+
+In this function:
+
+1. `wg.Add(1)` registers each worker.
+2. The goroutine calculates and writes its result.
+3. `defer wg.Done()` marks that worker complete.
+4. `wg.Wait()` waits for all registered workers.
+5. Only then does `SquareAll` return `out`.
+
+Without `wg.Wait()`, SquareAll could return while workers were still writing.
+The caller might see incomplete results, and the workers could continue
+running after the function returned.
+
+Java comparison
+---------------
+
+There is no exact one-to-one Java equivalent to a Go WaitGroup. The closest
+simple coordination tool is `java.util.concurrent.CountDownLatch`:
+
+- Go `wg.Add(numberOfWorkers)` is similar in purpose to creating a
+  `CountDownLatch(numberOfWorkers)`.
+- Go `wg.Done()` is similar to Java `latch.countDown()`.
+- Go `wg.Wait()` is similar to Java `latch.await()`.
+
+Java's `ExecutorService` is more like the mechanism that schedules work, while
+Go's `go` keyword starts a goroutine. Java `Future`/`CompletableFuture` can
+also represent individual results; this SquareAll example instead writes
+results into indexed positions of a shared output slice.
+
+WaitGroup methods and related synchronization operations
+-------------------------------------------------------
+
+`WaitGroup` itself has a small API; it does not have ten different methods.
+Its methods are:
+
+1. `Add(delta int)` — change the counter. A positive value registers work; a
+   negative value completes work. Prefer `Done()` for the common decrement.
+2. `Done()` — decrement the counter by one. Usually called with `defer` in
+   each worker.
+3. `Wait()` — block until the counter becomes zero.
+4. `Go(f func())` — start a function in a goroutine and track it in the group.
+   This method is available in Go 1.25 and later. When using it, do not also
+   call `Add`/`Done` for that same task.
+
+Here are commonly used operations from other types in Go's `sync` package.
+These are not WaitGroup methods:
+
+5. `Mutex.Lock()` — acquire an exclusive lock before accessing shared state.
+6. `Mutex.Unlock()` — release the exclusive lock; often deferred after Lock.
+7. `RWMutex.RLock()` — acquire a read lock; multiple readers may hold it
+   together while no writer holds the lock.
+8. `RWMutex.RUnlock()` — release a read lock.
+9. `RWMutex.Lock()` / `RWMutex.Unlock()` — acquire/release exclusive access
+   when changing shared state.
+10. `Once.Do(function)` — run an initialization function at most once, even
+    when multiple goroutines call it.
+11. `Cond.Wait()` — release a condition variable's lock and wait for a
+    notification; it reacquires the lock before returning.
+12. `Cond.Signal()` — wake one goroutine waiting on a condition variable.
+13. `Cond.Broadcast()` — wake all goroutines waiting on a condition variable.
+14. `Pool.Get()` / `Pool.Put(value)` — reuse temporary objects to reduce
+    repeated allocations; a Pool is not a general-purpose persistent store.
+15. `Map.Load(key)` / `Map.Store(key, value)` — read/write a value in
+    `sync.Map`, a concurrent map intended for particular access patterns.
+
+For SquareAll, the relevant operations are `WaitGroup.Add`, `WaitGroup.Done`,
+and `WaitGroup.Wait`. The other operations solve different synchronization
+problems and are listed here for orientation.
+
+`defer` in beginner terms
+-------------------------
+
+`defer` means: "run this call when the current function is about to finish."
+Deferred calls run even when the function exits early. Multiple deferred calls
+run in last-in, first-out order.
+
+For example:
+
+    func example() {
+        defer fmt.Println("second")
+        defer fmt.Println("first")
+        fmt.Println("function body")
+    }
+
+Output:
+
+    function body
+    first
+    second
+
+In SquareAll, the deferred call is `wg.Done()`. Each worker therefore reports
+completion as it exits, and the main function's `wg.Wait()` can eventually
+finish.
+
+Why can workers write to the same slice safely?
+-----------------------------------------------
+
+The slice header (`out`) is created before the goroutines start and is not
+resized. Each goroutine writes to a different element, such as `out[0]` or
+`out[1]`; distinct slice elements are distinct memory locations. The workers
+do not call `append`, which would update the shared slice length and could
+change its backing array.
+
+The function waits for all goroutines before returning. This coordination is
+important: do not read or use the results as complete until the workers have
+finished. Do not change the code to have all goroutines append to one shared
+slice without adding synchronization.
+
+Empty input
+-----------
+
+If `nums` is empty, `out` is an empty slice, the loop starts no goroutines,
+and `wg.Wait()` returns immediately because the WaitGroup counter is zero.
+SquareAll then returns the empty output slice.
+
+Additional questions
+--------------------
+
+How can goroutines run concurrently if they start inside a loop?
+---------------------------------------------------------------
+
+Yes, the `go` statement is inside the `for` loop. The loop itself runs
+sequentially: it visits one number, starts a goroutine for it, then moves to
+the next number.
+
+The important point is that `go` starts the function without waiting for that
+function to finish. After starting a worker, the loop continues. That worker
+can run while the loop starts other workers, so their work can overlap:
+
+    loop: start worker for 1 ---- start worker for 2 ---- start worker for 3
+    worker 1:                   calculate 1*1
+    worker 2:                                      calculate 2*2
+    worker 3:                                                       calculate 3*3
+
+The actual timing is decided by the Go runtime and operating system. On a
+multi-core computer, multiple goroutines may run at the same instant; on one
+core, they can take turns quickly. In either case, `go` allows the work to
+proceed independently instead of making the loop wait for each calculation.
+For tiny calculations like squaring an integer, goroutine overhead may mean
+this example is for learning concurrency rather than improving performance.
+
+How is the result order preserved?
+----------------------------------
+
+The function does not preserve order by making workers finish in order. They
+may finish in any order. It preserves order by keeping each input's original
+index and using that index as the output position:
+
+    input index:  0  1  2  3
+    input value:  1  2  3  4
+    output slot:  0  1  2  3
+
+For example, the worker receiving `(index=2, number=3)` always writes `9` to
+`out[2]`, even if it finishes before the workers for indexes 0 and 1. The
+worker for `(index=0, number=1)` writes to `out[0]`, and so on. Since each
+worker writes to its own distinct slot, completion order does not change the
+final slice order.
+
+`wg.Wait()` ensures all those indexed writes are finished before `SquareAll`
+returns the slice. Without that wait, the function could return while some
+slots still contained their initial zero values.
+
+
+so you mean that the iteration initiated by for loop does not wait for processing to be finished to initiate the next iteration and out put order is preserved as the result is written to the specific index

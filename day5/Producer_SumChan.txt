@@ -1,0 +1,357 @@
+Producer and SumChan: a beginner's guide to Go channels
+=======================================================
+
+The two methods being explained
+-------------------------------
+
+    // Produce sends the integers from 1 through n, then closes the channel.
+    func Produce(n int) <-chan int {
+        ch := make(chan int)
+
+        go func() {
+            defer close(ch)
+            for value := 1; value <= n; value++ {
+                ch <- value
+            }
+        }()
+
+        return ch
+    }
+
+    // SumChan reads values until ch is closed and returns their total.
+    func SumChan(ch <-chan int) int {
+        sum := 0
+        for value := range ch {
+            sum += value
+        }
+        return sum
+    }
+
+What is a channel?
+------------------
+
+A channel is a typed communication path that goroutines use to send values to
+each other. A channel has an element type: `chan int` carries integers,
+`chan string` carries strings, and so on.
+
+Think of it like a typed hand-off point:
+
+    producer goroutine -- sends values --> channel --> consumer goroutine
+
+The producer can send a value with `ch <- value`. A receiver takes a value
+with `value := <-ch`. Sending and receiving may block, depending on whether a
+receiver or buffer space is available. That coordination is one way channels
+help goroutines work together.
+
+Creating and initializing channels
+----------------------------------
+
+Use the built-in `make` function to create a usable channel:
+
+    unbuffered := make(chan int)
+    buffered := make(chan int, 3)
+
+- `make(chan int)` creates an unbuffered channel: it has no queue for values.
+- `make(chan int, 3)` creates a buffered channel with room for three values.
+- The channel's zero value is `nil`. A nil channel is not ready for normal
+  communication: sending or receiving on it blocks forever. Use `make` before
+  using a channel for communication.
+- A channel is a reference-like value. Assigning it to another variable copies
+  the channel reference, so both variables refer to the same channel.
+- You can create channels for other types, such as `make(chan string)` or
+  `make(chan MyStruct, 5)`.
+
+Channel directions: send, receive, or both
+-----------------------------------------
+
+These declarations express which operations a variable or function is allowed
+to perform:
+
+    chan int       // Bidirectional: can send and receive.
+    chan<- int     // Send-only: can send, but cannot receive from this value.
+    <-chan int     // Receive-only: can receive, but cannot send to this value.
+
+The arrow points in the direction that values travel:
+
+    chan<- int     // Values travel into the channel: send-only.
+    <-chan int     // Values travel out of the channel: receive-only.
+
+An ordinary channel created by `make(chan int)` is bidirectional. Go allows a
+bidirectional channel to be passed where a send-only or receive-only channel
+is expected. This lets APIs restrict what their callers can do.
+
+In `Produce`:
+
+    func Produce(n int) <-chan int
+
+The return type is `<-chan int`, so callers receive a read-only (receive-only)
+view of the channel. This restriction is written directly in the function
+signature, before the function body. For example:
+
+    numbers := Produce(5)
+    value := <-numbers // Allowed: receive.
+    numbers <- 6       // Compile error: this value is receive-only.
+    close(numbers)     // Compile error: this value is receive-only.
+
+The channel itself was created bidirectional inside `Produce`; returning it as
+`<-chan int` exposes only receive access to callers. The producer still has
+the original bidirectional `ch` and can send to and close it.
+
+If callers genuinely need permission to send too, the function could return
+`chan int` instead:
+
+    func Produce(n int) chan int
+
+Then callers could send to or close the channel as well as receive from it.
+That broader permission is usually a poor fit for this producer: callers
+could accidentally add values or close the channel while `Produce` is still
+sending. Prefer the narrowest direction that matches each role. If another
+part of a program should be allowed to send, design a separate send-capable
+API and clearly define which goroutine owns closing the channel.
+
+Sending and receiving values
+----------------------------
+
+    ch <- 42     // Send 42 into ch.
+    value := <-ch // Receive one value from ch and store it in value.
+    <-ch         // Receive and discard one value.
+
+For an unbuffered channel, a send and a receive must meet: the send waits
+until a receiver is ready, and the receive waits until a sender is ready.
+This is a hand-off, not a stored message.
+
+For a buffered channel, sends can place values into the buffer without an
+immediate receiver, until the buffer is full. A receive removes one value and
+makes room for another send. A receive from a buffered channel can still wait
+if the channel is empty.
+
+How close works
+---------------
+
+`close(ch)` is a built-in function, not a channel method. Closing means:
+"The sender is finished; no more values will be sent."
+
+- Closing does not discard values already buffered; receivers can still read
+  those values.
+- Once a closed channel's buffered values have been read, receives complete
+  immediately with the element type's zero value.
+- Closing is mainly a signal to receivers that no more values will arrive.
+- The goroutine responsible for sending should normally be the one to close
+  the channel, because it knows when sending is finished.
+- Do not close a channel from the receiver just because it has received
+  enough; the sender might still be sending.
+- Closing an already closed channel panics. Closing a nil channel also panics.
+- Sending on a closed channel panics.
+- Receiving from a closed channel is safe.
+
+To explicitly check whether a received value came from an open channel, use
+the comma-ok form:
+
+    value, ok := <-ch
+    if !ok {
+        // The channel is closed and has no more buffered values.
+    } else {
+        // value is a value that was sent through the channel.
+    }
+
+The `for value := range ch` form used by `SumChan` performs receives until the
+channel is closed and all buffered values are drained. It ends automatically;
+the receiver does not need to call `close`.
+
+Produce, line by line
+---------------------
+
+    func Produce(n int) <-chan int {
+
+- `func` declares a function named `Produce`.
+- `n int` means it accepts an integer parameter named `n`.
+- `<-chan int` is its return type: a receive-only channel carrying integers.
+- The function promises that the producer sends the sequence `1` through `n`
+  and closes the channel when sending is done.
+
+    ch := make(chan int)
+
+- `make(chan int)` creates an unbuffered channel for integers.
+- `ch` is bidirectional here, so the function can send values and close it.
+- Because it is unbuffered, each send waits until a receiver is ready.
+
+    go func() {
+
+- `func() { ... }` declares an anonymous function with no name and no
+  parameters.
+- The trailing `()` calls that anonymous function immediately.
+- `go` starts that call in a new goroutine instead of making `Produce` wait
+  for all its sends to finish.
+- This allows `Produce` to return the channel while the producer goroutine
+  sends values. The caller can begin receiving as soon as it has the channel.
+
+    defer close(ch)
+
+- `close(ch)` signals that this producer will send no more values.
+- `defer` schedules the close to run when this anonymous function returns.
+- It runs after the loop finishes, including when `n` is less than 1 and the
+  loop sends no values.
+- This producer is the owner of the sends, so it is the right place to close.
+
+    for value := 1; value <= n; value++ {
+
+- This is a three-part `for` loop.
+- `value := 1` initializes the first number to send.
+- `value <= n` continues while the current number is no greater than `n`.
+- `value++` adds one after each iteration.
+- For `n == 5`, the values sent are `1, 2, 3, 4, 5`.
+- For `n <= 0`, the condition is initially false; no values are sent and the
+  deferred close still runs.
+
+    ch <- value
+
+- `<-` points toward the channel, so this sends `value` into `ch`.
+- Since this channel is unbuffered, the send waits until a receiver accepts
+  the value.
+- Once received, the producer continues to the next loop iteration.
+
+    }()
+
+- The parentheses call the anonymous function.
+- Combined with the preceding `go`, they start the producer goroutine.
+- The goroutine may start running immediately, or it may be scheduled shortly
+  afterward; the function does not wait for it to finish.
+
+    return ch
+
+- Return the channel to the caller.
+- The local variable `ch` has type `chan int`, but the function's declared
+  return type is `<-chan int`.
+- Go permits this conversion from bidirectional to receive-only.
+- The caller can receive, but the type system prevents it from sending or
+  closing through this returned value.
+
+SumChan, line by line
+---------------------
+
+    func SumChan(ch <-chan int) int {
+
+- `SumChan` accepts a receive-only channel of integers.
+- It can receive values from `ch`; it cannot send to or close `ch`.
+- Its return type `int` says it returns one integer: the total.
+- Receive-only is appropriate because this function consumes values produced
+  elsewhere; it does not own the producer's channel.
+
+    sum := 0
+
+- Start the running total at zero.
+- Zero is the additive identity: adding it does not change a number.
+- If the channel closes without values, the answer remains zero.
+
+    for value := range ch {
+
+- `range` repeatedly receives the next value from the channel.
+- Each received value is assigned to `value`.
+- If no value is ready and the channel is still open, this receive waits.
+- The loop ends only when the channel is closed and all buffered values, if
+  any, have been received.
+
+    sum += value
+
+- Add the current received value to the running total.
+- The loop repeats to receive the next value.
+
+    return sum
+
+- This executes after the channel has been closed and drained.
+- Return the total of all values that were sent.
+
+How long does SumChan wait for the channel to close?
+----------------------------------------------------
+
+There is no built-in timeout in `SumChan`. It keeps receiving for as long as
+the channel remains open. If no value is ready, it blocks waiting for one.
+It returns only when the channel is closed and all sent/buffered values have
+been received.
+
+For the test:
+
+    total := SumChan(Produce(5))
+
+1. `Produce(5)` starts its producer goroutine and returns the receive-only
+   channel.
+2. `SumChan` starts receiving from that channel.
+3. The producer sends `1` through `5`; the consumer adds each value.
+4. The producer finishes the loop and closes the channel.
+5. `range` sees the closed-and-drained channel, ends, and `SumChan` returns 15.
+
+Who stops, and how does each side know?
+---------------------------------------
+
+- The **producer** stops when its loop condition `value <= n` becomes false.
+  It then returns from its goroutine, and deferred `close(ch)` tells receivers
+  that no more values will be sent.
+- The **consumer** stops when it receives from the closed channel after all
+  values have been drained. `for value := range ch` handles this stop signal
+  automatically.
+- The producer does not wait for the consumer to finish all its processing
+  before generating the next value. With this unbuffered channel, it does wait
+  for each individual value to be received before sending the next one.
+- In this particular example, after the last send is received, the producer
+  can finish and close while the consumer adds that last value. The consumer
+  then observes the close on its next receive and returns its total.
+- There is no fixed time limit. It usually completes promptly when both sides
+  participate. If the consumer stops receiving early, the producer may block
+  forever on a later send. Production code may need cancellation or another
+  way to ensure blocked goroutines can stop.
+
+Important channel patterns and beginner warnings
+------------------------------------------------
+
+1. **One sender, one closer:** Prefer having the sending side own `close`.
+   Never close just to mean "I, the receiver, am done reading."
+2. **Range means receive until close:** `for v := range ch` does not stop
+   after one value or after the producer pauses; it waits until close.
+3. **A pause is not a close:** If a producer is slow but still working, the
+   receiver simply waits. It cannot distinguish "slow" from "finished" without
+   a value, close, timeout, or cancellation signal.
+4. **Unbuffered channels synchronize every send:** Each send needs a receiver
+   at that time. Buffered channels allow a limited number of sends ahead.
+5. **Buffer size does not mean total capacity:** A channel with capacity 3
+   can carry any number of values over time if a consumer keeps receiving; it
+   only stores up to 3 values at once without receivers.
+6. **Do not guess completion from a value:** A value such as `0` could be
+   legitimate data. Use channel close or the comma-ok receive to identify
+   completion.
+7. **A nil channel blocks:** A nil channel send or receive waits forever.
+   This can be deliberately useful in `select`, but usually indicates
+   uninitialized channel use.
+8. **Avoid goroutine leaks:** If a receiver might stop early, the sender needs
+   a cancellation path; otherwise it could remain blocked sending forever.
+9. **Channels are typed:** A `chan int` cannot carry a string. This catches
+   many mistakes at compile time.
+10. **Channel direction communicates roles:** Use `chan<- T` for a sender
+    parameter and `<-chan T` for a receiver parameter when the function does
+    not need both operations.
+
+Adding cancellation (conceptual example)
+----------------------------------------
+
+If the consumer may stop early, a producer can also listen for a cancellation
+signal. This is not required by the assignment, but it prevents a sender from
+being stuck forever:
+
+    func ProduceWithCancel(ctx context.Context, n int) <-chan int {
+        ch := make(chan int)
+        go func() {
+            defer close(ch)
+            for value := 1; value <= n; value++ {
+                select {
+                case ch <- value:
+                    // The value was received; continue producing.
+                case <-ctx.Done():
+                    return // Stop early; deferred close still runs.
+                }
+            }
+        }()
+        return ch
+    }
+
+Here the producer either sends a value when a receiver is ready or returns
+when the context is cancelled. The deferred close still tells any remaining
+receiver that no more values will arrive.

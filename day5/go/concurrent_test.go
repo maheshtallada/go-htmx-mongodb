@@ -17,6 +17,9 @@ func TestSquareAll(t *testing.T) {
 	}
 }
 
+// go test -race ./... shows no data race --> to
+//  execute this we need a cgo or gcc c compiler
+
 // A2
 func TestChannels(t *testing.T) {
 	if SumChan(Produce(5)) != 15 {
