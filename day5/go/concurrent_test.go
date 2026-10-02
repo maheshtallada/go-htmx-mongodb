@@ -37,21 +37,22 @@ func TestContextCancel(t *testing.T) {
 	}
 }
 
-// A4
+// A4 asks us to let 100 goroutines increment one shared counter and verify the
+// result is exactly 100 without a data race; this test coordinates and checks it.
 func TestCounterConcurrentIncrement(t *testing.T) {
-	var counter Counter
-	var wg sync.WaitGroup
+	var counter Counter    // One shared counter instance is used by all workers.
+	var wg sync.WaitGroup  // Separate from the mutex: waits for all workers to finish.
 
 	for i := 0; i < 100; i++ {
-		wg.Add(1)
+		wg.Add(1) // Count this worker before starting it.
 		go func() {
-			defer wg.Done()
-			counter.Increment()
+			defer wg.Done()       // Tell the test this worker is finished.
+			counter.Increment()   // The Counter method's mutex protects the shared update.
 		}()
 	}
 
-	wg.Wait()
-	if got := counter.Value(); got != 100 {
+	wg.Wait() // Do not check the total until all 100 increments have completed.
+	if got := counter.Value(); got != 100 { // Read through the synchronized method and assert A4's expected total.
 		t.Fatalf("counter = %d; want 100", got)
 	}
 }

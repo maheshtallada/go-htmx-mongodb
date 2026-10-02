@@ -46,34 +46,38 @@ func SumChan(ch <-chan int) int {
 	return sum // Return the total after the channel has closed and drained.
 }
 
+// SlowDouble returns n*2 after 100ms, but respects ctx cancellation.
+// If ctx is done first, it returns ctx.Err().
 // SlowDouble returns n multiplied by 2 after 100ms, unless ctx is cancelled first.
 // When cancellation wins, it returns zero and the context's cancellation error.
 func SlowDouble(ctx context.Context, n int) (int, error) {
 	timer := time.NewTimer(100 * time.Millisecond) // Start a timer that represents the normal delay.
 	defer timer.Stop()                             // Release timer resources if cancellation happens first.
 
-	select { // Wait for either the delay to finish or the caller to cancel.
-	case <-timer.C: // The timer fired, so the requested delay elapsed.
+	// Unlike a Java switch, select waits for channel operations to become ready
+	// and runs one ready case; if both are ready, either case may be chosen.
+	select {
+	case <-timer.C: // <- means receive; Timer provides this channel, which is ready after 100ms.
 		return n * 2, nil // Return the doubled number and no error.
-	case <-ctx.Done(): // The context was cancelled or its deadline expired.
+	case <-ctx.Done(): // Done() supplies a channel; receive succeeds when ctx is cancelled or expires.
 		return 0, ctx.Err() // Return the context's reason for stopping.
 	}
 }
 
-// Counter stores an integer that can be safely shared by concurrent goroutines.
+// Counter is the shared integer A4 asks 100 goroutines to increment safely.
 type Counter struct {
 	mu    sync.Mutex // Protect value so only one goroutine accesses it at a time.
 	value int        // Hold the current count; its zero value starts the count at zero.
 }
 
-// Increment adds one to the counter while holding its mutex.
+// Increment is the worker operation: lock, update the shared value, then unlock.
 func (c *Counter) Increment() {
 	c.mu.Lock()         // Acquire exclusive access before reading or changing value.
 	defer c.mu.Unlock() // Release exclusive access when this method returns.
 	c.value++           // Update the protected count without a data race.
 }
 
-// Value returns the counter's current value while holding its mutex.
+// Value reads the final count safely after the test's workers have finished.
 func (c *Counter) Value() int {
 	c.mu.Lock()         // Acquire the same lock used by Increment for a consistent read.
 	defer c.mu.Unlock() // Release the lock whether the method returns normally or not.

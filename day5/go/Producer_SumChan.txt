@@ -135,7 +135,7 @@ How close works
   those values.
 - Once a closed channel's buffered values have been read, receives complete
   immediately with the element type's zero value.
-- Closing is mainly a signal to receivers that no more values will arrive.
+- ******  Closing is mainly a signal to receivers that no more values will arrive.*****
 - The goroutine responsible for sending should normally be the one to close
   the channel, because it knows when sending is finished.
 - Do not close a channel from the receiver just because it has received
@@ -188,7 +188,7 @@ Produce, line by line
     defer close(ch)
 
 - `close(ch)` signals that this producer will send no more values.
-- `defer` schedules the close to run when this anonymous function returns.
+- *****`defer` schedules the close to run when this anonymous function returns.*****
 - It runs after the loop finishes, including when `n` is less than 1 and the
   loop sends no values.
 - This producer is the owner of the sends, so it is the right place to close.
