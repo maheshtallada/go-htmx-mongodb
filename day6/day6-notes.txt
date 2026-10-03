@@ -1,0 +1,21 @@
+Part A - Go: Chi routes and middleware
+
+A1. Router and HTTP handlers
+- http.Handler is the interface with ServeHTTP(ResponseWriter, *Request).
+  http.HandlerFunc adapts a function with that signature to the interface.
+- Chi matches {name} in the route pattern and chi.URLParam reads the named
+  value from the request context.
+
+A2. Middleware
+- Middleware wraps a next http.Handler, performs work before or after it,
+  and calls next.ServeHTTP to continue the chain.
+- Common middleware includes request logging, authentication/authorization,
+  and request IDs or tracing. Chi middleware.Logger logs requests in the
+  same handler-wrapping chain.
+
+A3. Recoverer
+- Recoverer intercepts a panic in a request handler, logs it, and sends an
+  HTTP 500 response so one handler panic does not crash the server.
+
+Run the Go exercises: cd day6/go; go test ./...
+Walkthrough: go/chi-router-middleware.md

@@ -1,0 +1,209 @@
+Day 6 Chi Router and Middleware: step-by-step walkthrough
+=========================================================
+
+Files covered
+-------------
+
+    router.go  builds the Chi router, registers routes, and defines middleware.
+    main.go    composes the middleware and router, then starts the HTTP server.
+    main_test.go exercises the endpoints and middleware without opening a port.
+
+The key idea
+------------
+
+An HTTP handler receives a request and writes a response. A router is a handler
+that chooses another handler based on the request method and URL. Middleware is
+also a handler: it wraps another handler so it can do work before or after
+passing the request on.
+
+The application is composed like this:
+
+    HTTP request
+        -> RequestID middleware
+            -> Chi router
+                -> matching route handler
+                    -> HTTP response
+
+`Router()` returns a Chi router as an `http.Handler`. In `main`, that router is
+wrapped by `RequestID`, and the resulting handler is passed to
+`http.ListenAndServe`.
+
+How this differs from the Day 1 and Day 2 endpoints
+--------------------------------------------------
+
+The HTTP ideas are the same; the routing tool and the purpose of the examples
+are different. In Day 1/Day 2, the endpoints used Go's standard `net/http`
+handlers and/or the HTMX application flow you were learning. Those examples
+did not need Chi to receive an HTTP request, read its path, and write a
+response. Go's standard library can do that on its own (for example with
+`http.HandleFunc` and `http.ServeMux`).
+
+Day 6 introduces Chi as an optional third-party router. Here, `chi.NewRouter`
+creates the route table, `r.Get` associates a method and path pattern with a
+handler, and `{name}` plus `chi.URLParam` demonstrates named path parameters.
+The same route behavior could be implemented without Chi using the standard
+library; Chi makes route declarations, parameters, and middleware composition
+more convenient as an application grows.
+
+These `/health` and `/greet/{name}` endpoints are small teaching examples
+chosen to focus on routing and middleware. They are not intended to replace or
+change the Day 1/Day 2 HTMX endpoints. HTMX is a browser-side mechanism that
+makes HTTP requests and swaps returned HTML fragments into the page; Chi is a
+server-side router that decides which Go handler receives an HTTP request.
+An application can use both together: Chi routes a request from an HTMX
+attribute such as `hx-get` to a handler, and that handler returns a full page
+or an HTML fragment.
+
+Router implementation, line by line
+-----------------------------------
+
+    package main
+
+- This package contains the executable. Go files in the same directory can
+  refer to each other's functions and types because they share this package.
+
+    import (
+        "net/http"
+        "github.com/go-chi/chi/v5"
+        "github.com/go-chi/chi/v5/middleware"
+    )
+
+- `net/http` defines standard request, response, and handler types.
+- Chi is the third-party router used to match routes and path parameters.
+- Chi's `middleware` package provides the `Recoverer` handler wrapper.
+
+    func Router() http.Handler {
+
+- `Router` builds the route table and returns it using Go's standard
+  `http.Handler` interface, rather than exposing the concrete Chi router type.
+- The caller can use the result anywhere an HTTP handler is expected.
+
+    r := chi.NewRouter()
+
+- Create an empty Chi router. At this point it has no application routes.
+- `r` is a Chi router that also implements `http.Handler`.
+
+    r.Use(middleware.Recoverer)
+
+- Add Chi's panic-recovery middleware to the router's handler chain.
+- If a route handler panics while serving a request, Recoverer logs the panic
+  and returns an HTTP 500 rather than letting that request crash the server.
+- This does not replace normal error handling; it is a last line of defense
+  against an unexpected panic.
+
+    r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+        _, _ = w.Write([]byte("ok"))
+    })
+
+- Register a handler for HTTP GET requests whose path is exactly `/health`.
+- Chi calls the function when a request matches that method and path.
+- `w` is the response writer; writing bytes to it sends the response body.
+- The second argument is the incoming request. Its name is `_` because this
+  endpoint does not need to inspect it.
+- `Write` returns a byte count and an error. This small exercise deliberately
+  ignores those results to keep the example focused on routing.
+
+    r.Get("/greet/{name}", func(w http.ResponseWriter, req *http.Request) {
+        _, _ = w.Write([]byte("Hello, " + chi.URLParam(req, "name") + "!"))
+    })
+
+- Register another GET route. `{name}` is a Chi URL parameter matching one
+  path segment: for example, `/greet/Mahesh` captures `Mahesh`.
+- `chi.URLParam(req, "name")` reads that captured value from the request.
+- The handler builds the greeting and writes it into the response body.
+
+    r.Get("/panic", func(http.ResponseWriter, *http.Request) {
+        panic("intentional recovery exercise")
+    })
+
+- This exercise route panics on purpose. The response writer and request are
+  unnamed because the handler does not use them.
+- `Recoverer`, registered above, catches the panic and sends an HTTP 500.
+- It makes the optional recovery behavior directly testable.
+
+    return r
+
+- Return the configured router. Go permits the concrete router value to be
+  returned as the `http.Handler` interface because it implements `ServeHTTP`.
+
+RequestID middleware, line by line
+----------------------------------
+
+    func RequestID(next http.Handler) http.Handler {
+
+- Middleware accepts the next handler in the chain and returns a new handler.
+- This signature lets it wrap a router or another middleware.
+
+    return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+
+- `http.HandlerFunc` converts a function with the standard handler signature
+  into a value implementing the `http.Handler` interface.
+- `w` and `req` are the current response writer and request.
+
+    w.Header().Set("X-Request-ID", "test-123")
+
+- Add the header before calling the next handler, so it is present when the
+  response is written.
+- The assignment permits a fixed value for this exercise. Real request IDs
+  would usually be generated uniquely or accepted from trusted infrastructure.
+
+    next.ServeHTTP(w, req)
+
+- Pass the same request and response writer to the wrapped handler.
+- In `main`, `next` is the Chi router. That router selects and runs the route.
+- A middleware may also inspect or modify the response after this call returns.
+
+    })
+}
+
+- Close the function adapter, then return from `RequestID`.
+
+main.go, line by line
+---------------------
+
+    func main() {
+        handler := RequestID(Router())
+        log.Fatal(http.ListenAndServe(":8080", handler))
+    }
+
+- `Router()` first creates the Chi router and its route/middleware chain.
+- `RequestID(...)` wraps that router and returns the complete HTTP handler.
+- `ListenAndServe` opens the TCP listener on port 8080 and dispatches incoming
+  requests to the handler. It blocks while serving.
+- If the server stops with an error, `log.Fatal` prints the error and exits
+  with a non-zero status. A normal, graceful shutdown would require a
+  `http.Server` and its `Shutdown` method; this assignment's starter uses the
+  simpler `ListenAndServe` form.
+
+What is an http.Handler?
+------------------------
+
+The `http.Handler` interface has one method:
+
+    ServeHTTP(ResponseWriter, *Request)
+
+An `http.HandlerFunc` is a function adapter that implements this interface.
+Handlers are composable because routers, middleware, and ordinary handler
+functions can all be passed using this common interface.
+
+What the tests prove
+--------------------
+
+`httptest.NewRequest` creates a request in memory. `httptest.NewRecorder`
+captures the status, headers, and body that the handler writes. Calling
+`ServeHTTP` executes the handler chain without binding a network port.
+
+- The health test verifies status 200 and body `ok`.
+- The greet test verifies Chi extracted the URL parameter and returned the
+  personalized body.
+- The middleware test wraps the router and checks the request ID response
+  header.
+- The recovery test invokes `/panic` and checks that Recoverer returned 500.
+
+Run the exercise from `day6/go`:
+
+    go test ./...
+    go run .
+
+Then request `http://localhost:8080/health` or
+`http://localhost:8080/greet/Mahesh`.
